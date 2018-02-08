@@ -3,4 +3,4 @@ Designed to automate the process of earning points on kingdomlikes. (selenium we
 
 # TODO
 
-- [] Fails to like IG photos from time to time
+- [ ] Fails to like IG photos from time to time
