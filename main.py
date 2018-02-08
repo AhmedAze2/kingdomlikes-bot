@@ -5,8 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.common import exceptions
 from selenium import webdriver
 from time import sleep
-import itertools
-import re, pickle
+import itertools, re, pickle, json
 
 with open('config.json') as data_file:
     data = json.load(data_file)
@@ -14,6 +13,10 @@ with open('config.json') as data_file:
 browser = webdriver.Chrome(data['webdriver_filepath'])
 #browser.set_window_position(1100,5)
 
+# Cookie filenames:
+# ytCookies.pkl
+# fbCookies.pkl
+# igCookies.pkl
 
 class KingdomLikesBot:
     def __init__(self):
@@ -22,47 +25,20 @@ class KingdomLikesBot:
         self.popup = None
 
         self.wait = WebDriverWait(browser, 10)
-
-    def collect_youtube_cookies(self):
-        """This function collects cookies for later use in kingdomlikes"""
-        pickle.dump(browser.get_cookies(), open('ytCookies.pkl', 'wb'))
-
-    def collect_facebook_cookies(self):
-        """This function collects cookies for later use in kingdomlikes"""
-        pickle.dump(browser.get_cookies(), open('fbCookies.pkl', 'wb'))
-
-    def collect_instagram_cookies(self):
-        """This function collects cookies for later use in kingdomlikes"""
-        pickle.dump(browser.get_cookies(), open('igCookies.pkl', 'wb'))
-
-    def load_FB_cookies(self):
+        
+    def collect_cookies(self, filename):
+        """This function collects cookies for later use."""
+        with open(filename, 'wb') as file:
+            pickle.dump(browser.get_cookies(), file)
+            print('INFO: Cookies collected')
+            
+    def load_cookies(self, filename):
         """Loads cookies from .pkl file, this is needed so that we dont'
         have to retype the username and pwd in every popup. """
-
-        cookies = pickle.load(open("fbLikesCookies.pkl", "rb"))
-        for cookie in cookies:
-            browser.add_cookie(cookie)
-        print('laoded cookies, refreshing page.')
-        browser.refresh()
-
-    def load_IG_cookies(self):
-        """Loads cookies from .pkl file, this is needed so that we dont'
-        have to retype the username and pwd in every popup. """
-
-        cookies = pickle.load(open("igCookies.pkl", "rb"))
-        for cookie in cookies:
-            browser.add_cookie(cookie)
-        print('laoded cookies, refreshing page.')
-        browser.refresh()
-
-    def load_YT_cookies(self):
-        """Loads cookies from .pkl file, this is needed so that we dont'
-        have to retype the username and pwd in every popup. """
-
-        cookies = pickle.load(open("ytCookies.pkl", "rb"))
-        for cookie in cookies:
-            browser.add_cookie(cookie)
-        print('loaded cookies, refreshing page.')
+        cookies = pickle.load(open(filename, 'rb'))
+        for c in cookies:
+            browser.add_cookie(c)
+            print('INFO: Loaded cookies')
         browser.refresh()
 
     def login_KingdomLikes(self, email, pwd):
@@ -73,8 +49,10 @@ class KingdomLikesBot:
         password = browser.find_element_by_name('password')
         username.send_keys(email)
         password.send_keys(pwd)
+
         # Press the login button
-        browser.find_element_by_css_selector('#formlogin > div:nth-child(1) > input.button.blue').click()
+        selector = '#formlogin > div:nth-child(1) > input.button.blue'
+        browser.find_element_by_css_selector(selector).click()
 
     def like_YT_video(self, n : int):
         """Finds and presses the like button and closes the popup window when done."""
@@ -82,8 +60,9 @@ class KingdomLikesBot:
 
         try:
             # Like the video
-            likeBut = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'ytd-video-primary-info-renderer > div > div > div > div > '
-                                                                                       'ytd-menu-renderer > div > ytd-toggle-button-renderer > a')))
+            selector = ('ytd-video-primary-info-renderer > div > div > div > div >' 
+                        'ytd-menu-renderer > div > ytd-toggle-button-renderer > a')
+            likeBut = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
             likeBut.click()
             print('Liked the video')
             sleep(1.5) 
@@ -96,7 +75,6 @@ class KingdomLikesBot:
 
         except TimeoutException as e:
             print('--> The FB page in the popup was "broken" or the internet connection was not fast enough', e)
-
         finally:
             # Switch control to the main_window
             browser.switch_to_window(self.main_window)              
@@ -121,8 +99,6 @@ class KingdomLikesBot:
 
         except TimeoutException as e:
             print('----> The FB page in the popup was "broken" or the internet connection was not fast enough', e)
-
-
         finally:
             # Switch control to the main_window
             browser.switch_to_window(self.main_window)
@@ -136,7 +112,7 @@ class KingdomLikesBot:
         try:
             # like the photo
             sleep(2)
-            likeBut = self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, '_eszkz _l9yih')))
+            likeBut = self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, '._eszkz._l9yih')))
             likeBut.click()
             print('----> liked the IG photo')
 
@@ -148,12 +124,10 @@ class KingdomLikesBot:
 
         except TimeoutException as e:
             print('----> The IG photoo in the popup was "broken" or the internet connection was not fast enough', e)
-
         finally:
             # Switch control to the main_window
             browser.switch_to_window(self.main_window)
             print('finally')
-
             return failure
 
     def like_IG_follow(self, n : int):
@@ -319,7 +293,7 @@ class KingdomLikesBot:
 
             # Switch to the popup; load cookies; dislike it; close popup.
             self.switch_to_popup()
-            self.load_YT_cookies()
+            self.load_cookies(filename='ytCookies.pkl')
             self.like_YT_video(n=0)
 
         elif n == 2:
@@ -335,7 +309,7 @@ class KingdomLikesBot:
 
             # Switch to the popup; load cookies; dislike it; close popup.
             self.switch_to_popup()
-            self.load_YT_cookies()
+            self.load_cookies(filename='ytCookies.pkl')
             self.dislike_YT_video(n=0)
 
         elif n == 3:
@@ -351,7 +325,7 @@ class KingdomLikesBot:
 
             # Switch to the popup; load cookies; like it; close popup.
             self.switch_to_popup()
-            self.load_FB_cookies()
+            self.load_cookies(filename="fbCookies.pkl")
             self.like_FB_page(n=0)
 
         elif n == 4:
@@ -367,7 +341,7 @@ class KingdomLikesBot:
 
             # Switch to the popup; load cookies; like it; close popup.
             self.switch_to_popup()
-            self.load_IG_cookies()
+            self.load_cookies(filename="igCookies.pkl")
             self.like_IG_photo(n=0)
 
         elif n == 5:
@@ -386,34 +360,50 @@ class KingdomLikesBot:
             self.load_IG_cookies()
             self.like_IG_follow(n=0)
 
-
+    def add_to_recentlyCompletedNames(self, but_nr, name):
+        global recently_done_names
+        try:
+            print('HAS ALREADY DONE THIS BEFORE, SKIPPING IT !!!!!!!!')
+            # If the name already has been noted, assume it has been completed before (or broken) and SKIP IT'
+            recently_done_names[name]
+            sleep(2)
+            list_of_skip_buttons[but_nr].click()
+        except KeyError:
+            # add it to the dict
+            recently_done_names[name] = True
+            # If the dict is longer than 20 names, clean it.
+            if len(recently_done_names) > 20:
+                recently_done_names = {}
 
 
 browser.get('http://kingdomlikes.com/free_points/facebook-likes')
 bot_1 = KingdomLikesBot()
 bot_1.login_KingdomLikes(email=data['email'], pwd=data['pwd'])
 
-for network_nr in range(3, 6):
+for network_nr in range(4, 6):
     assume_finnished = False # If two buttons in succession are taking too long to load -> change network
     bot_1.FINNISHED = False
     bot_1.change_network(n=network_nr)
     but_nr = 1
+    recently_done_names = {}  # To make sure, it doesn't retries the same names several times
+    # When the bot (think) it has completed one, temp save it in this dict, if it later reappears
+    # don't try to complete it - skip it instead.
 
     while not bot_1.FINNISHED:
         try:
             print('BUTTON_NR ->', but_nr)
             list_of_like_buttons = WebDriverWait(browser, 30).until(EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".button.blue")))
             list_of_skip_buttons = WebDriverWait(browser, 30).until(EC.visibility_of_all_elements_located((By.LINK_TEXT, "[Skip]")))
-            print('Found: like buttons: {}\tskip buttons: {}'.format(len(list_of_like_buttons), len(list_of_skip_buttons)))
+            list_of_names = [x.text for x in browser.find_elements_by_css_selector("div > div.container > div.containertitle.remove > h6")]
+            print('Found: like buttons: {}\tskip buttons: {}\t names: {}'.format(len(list_of_like_buttons), len(list_of_skip_buttons), list_of_names))
         except TimeoutException as e:
             print('There is not more points to be earned on this network. Error:', e)
             bot_1.FINNISHED = True
             continue
-
         try:
             list_of_like_buttons[but_nr].click()
         except IndexError:
-            # There isn't eg. a 5. button, set but_nr to click to -> 0
+            # There isn't a eg. fifth button, set but_nr to click to -> 0
             print('- ERROR: IndexError!')
             but_nr = 0
             continue
@@ -464,6 +454,10 @@ for network_nr in range(3, 6):
                 print('- ERROR: element is loading - not clickable\n', e)
                 continue
         else:
+            print('but_nr: {}, name: "{}" of type: {}'.format(but_nr, list_of_names[but_nr], type(list_of_names[but_nr])))
+            # Check if it is in 'recently_done_names'; if it is SKIP IT; else add it to the dict.
+            bot_1.add_to_recentlyCompletedNames(but_nr=but_nr, name=list_of_names[but_nr])
+
             # Succesfully handled the popup; 'but_nr += 1' so handle the next but_nr popup
             but_nr += 1
             sleep(2)
