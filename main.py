@@ -57,7 +57,6 @@ class KingdomLikesBot:
     def like_YT_video(self, n : int):
         """Finds and presses the like button and closes the popup window when done."""
         failure = n + 1
-
         try:
             # Like the video
             selector = ('ytd-video-primary-info-renderer > div > div > div > div >' 
@@ -69,7 +68,6 @@ class KingdomLikesBot:
 
             # Close the popup
             browser.close()
-
             # Succesfully liked the page - setting failure to False
             failure = False
 
@@ -84,7 +82,6 @@ class KingdomLikesBot:
     def dislike_YT_video(self, n : int):
         """Finds and presses the dislike button and closes the popup window when done."""
         failure = n + 1
-
         try:
             # dislike the video
             likeBut = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'ytd-video-primary-info-renderer > div > div > div > div > ytd-menu-renderer > div > ytd-toggle-button-renderer:nth-child(2) > a')))
@@ -93,7 +90,6 @@ class KingdomLikesBot:
 
             # Close the popup
             browser.close()
-
             # Succesfully liked the page - setting failure to False
             failure = False
 
@@ -108,17 +104,18 @@ class KingdomLikesBot:
     def like_IG_photo(self, n : int):
         """Finds and presses the like button and closes the popup window when done."""
         failure = n + 1
-
         try:
-            # like the photo
             sleep(2)
-            likeBut = self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, '._eszkz._l9yih')))
+            # Close the popup asking you to download the IG app; it makes the like button unclickable.
+            popup = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'span._lilm5')))
+
+            # like the photo
+            likeBut = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'a._eszkz._l9yih')))
             likeBut.click()
             print('----> liked the IG photo')
 
             # Close the popup
             browser.close()
-
             # Succesfully liked the photo - setting failure to False
             failure = False
 
@@ -159,7 +156,6 @@ class KingdomLikesBot:
     def like_FB_photo(self, n : int):
         """Finds and presses the like button and closes the popup window when done."""
         failure = n + 1
-
         try:
             # Close the popup first
             closeBut = self.wait.until(EC.element_To_be_clickable((By.CSS_SELECTOR, 'body > div > div > div > a')))
@@ -173,7 +169,6 @@ class KingdomLikesBot:
 
             # Close the popup
             browser.close()
-
             # Succesfully liked the page - setting failure to False
             failure = False
 
@@ -199,7 +194,6 @@ class KingdomLikesBot:
 
             # Close the popup
             browser.close()
-
             # Succesfully liked the page - setting failure to False
             failure = False
 
@@ -236,16 +230,22 @@ class KingdomLikesBot:
         skipButtons = browser.find_elements_by_css_selector('div.pagecontent.normalheight.left.hide > div > div.containerbtn.remove > a')
         return skipButtons
 
-    def switch_to_popup(self):
+    def switch_to_popup(self, max_retries=10):
         """Waits for the popup to be presence, before switching focus to the popup."""
-        print(browser.window_handles)
+        # Wait for the popup to be selectable
         while len(browser.window_handles) == 1:
-            sleep(1)
             print(len(browser.window_handles), browser.window_handles)
-
+            sleep(1)
+            if max_retries == 0:
+                return
+            else:
+                max_retries -= 1
+        print('Popup located')
+        # Switch focus to the popup window
         self.popup = browser.window_handles[1]
         browser.switch_to_window(self.popup)
         print('Succesfully switched to popup.')
+        return 'succes'
 
     def get_list_of_like_buttons(self) -> list:
         """Return 'list_of_like_buttons' """
@@ -257,15 +257,15 @@ class KingdomLikesBot:
         except WebDriverException:
             print('There is not more points to be earned on this network. Error:', e)
             print('STOPPING HERE NOW')
-            exit()
+            return
 
-    def click_on_button(self, but_nr):
+    def click_on_button(self, button, max_retries=40):
         """Keeps trying to click on the given 'but_nr' button, until it is succesful"""
         print('Starting to spam the button..')
-        while True:
+        while max_retries:
             # Keep trying to click on the button, until it's loaded and clickable
             try:
-                self.list_of_like_buttons[but_nr].click()
+                button.click()
                 print('--> Succesfully clicked the button')
                 return
             except WebDriverException as e:
@@ -275,99 +275,87 @@ class KingdomLikesBot:
                 continue
             except TypeError:
                 print("'NoneType' object is not subscriptable'\n - Unclear why this error is gotten\n")
+            finally:
+                max_retries -= 1
+
+    def prepare_network(self, network_name, cookies_filename, action_func):
+        """Runs one ad in order to prepare for future ads on the specific network.
+        Example:
+        	click on the like button; switch to popup; load cookies; like it; close popup.
+        """
+        print(network_name, type(network_name))
+        # Click on the new network (eg. Youtube likes)
+        but = self.wait.until(EC.presence_of_element_located(
+            (By.LINK_TEXT, network_name)
+        ))
+        but.click()
+        print(f'Succesfully clicked on the network: {network_name}')
+
+        # Wait for any button to appear
+        self.list_of_like_buttons = self.get_list_of_like_buttons()
+
+        # If there was not found any buttons (ads)
+        if not self.list_of_like_buttons:
+            return self.change_network(n + 1)
+
+        # Keep clicking on the ad button until it is clickable (it reacts)
+        self.click_on_button(button=self.list_of_like_buttons[0])
+
+        # Switch to the popup; load cookies; like/follow/dislike (do the action on it); close popup.
+        if self.switch_to_popup():
+            self.load_cookies(filename=cookies_filename)
+            action_func(n=0)
+        else:
+            # If failed to switch to popup, re-run the entire function
+            return self.prepare_network(network_name, cookies_filename, action_func)
 
     def change_network(self, n):
-        """Change network to earn points on; Eg. change from FB page like to YT Dislikes. AND
-        set everything up: click on the first button; switch to popup; load cookies; like it; close popup."""
+        """This changes the network and prepares the network.
+        Example:
+        	Change network eg. change from FB page like to YT Dislikes.
+        	run -> prepare_network function
+        """
 
         if n == 1:
-            # Click on the network: Youtube likes
-            but = self.wait.until(EC.presence_of_element_located((By.LINK_TEXT, 'YouTube Likes')))
-            but.click()
-
-            # Wait for any button to appear
-            self.list_of_like_buttons = self.get_list_of_like_buttons()
-
-            # Keep clicking on the button, until it is clickable (it reacts)
-            self.click_on_button(but_nr=0)
-
-            # Switch to the popup; load cookies; dislike it; close popup.
-            self.switch_to_popup()
-            self.load_cookies(filename='ytCookies.pkl')
-            self.like_YT_video(n=0)
-
+            var1 = 'YouTube Likes'
+            var2 = 'ytCookies.pkl'
+            var3 = self.like_YT_video
+            print(f'Changing network to {var1}')
         elif n == 2:
-            # Click on the network: Youtube dislikes
-            but = self.wait.until(EC.presence_of_element_located((By.LINK_TEXT, 'YouTube disLikes')))
-            but.click()
-
-            # Wait for any button to appear
-            self.list_of_like_buttons = self.get_list_of_like_buttons()
-
-            # Keep clicking on the button, until it is clickable (it reacts)
-            self.click_on_button(but_nr=0)
-
-            # Switch to the popup; load cookies; dislike it; close popup.
-            self.switch_to_popup()
-            self.load_cookies(filename='ytCookies.pkl')
-            self.dislike_YT_video(n=0)
-
+            var1 = 'YouTube disLikes'
+            var2 = 'ytCookies.pkl'
+            var3 = self.dislike_YT_video
+            print(f'Changing network to {var1}')
         elif n == 3:
-            # Click on the network: FB Page Like
-            but = self.wait.until(EC.presence_of_element_located((By.LINK_TEXT, 'Facebook Likes')))
-            but.click()
-
-            # Wait for any button to appear
-            self.list_of_like_buttons = self.get_list_of_like_buttons()
-
-            # Keep clicking on the button, until it is clickable (it reacts)
-            self.click_on_button(but_nr=0)
-
-            # Switch to the popup; load cookies; like it; close popup.
-            self.switch_to_popup()
-            self.load_cookies(filename="fbCookies.pkl")
-            self.like_FB_page(n=0)
-
+            var1 = 'Facebook Likes'
+            var2 = 'fbCookies.pkl'
+            var3 = self.like_FB_page
+            print(f'Changing network to {var1}')
         elif n == 4:
-            # Click on the network: Instagram Like
-            but = self.wait.until(EC.presence_of_element_located((By.LINK_TEXT, 'Instagram Likes')))
-            but.click()
-
-            # Wait for any button to appear
-            self.list_of_like_buttons = self.get_list_of_like_buttons()
-
-            # Keep clicking on the button, until it is clickable (it reacts)
-            self.click_on_button(but_nr=0)
-
-            # Switch to the popup; load cookies; like it; close popup.
-            self.switch_to_popup()
-            self.load_cookies(filename="igCookies.pkl")
-            self.like_IG_photo(n=0)
-
+            var1 = 'Instagram Likes'
+            var2 = 'igCookies.pkl'
+            var3 = self.like_IG_photo
+            print(f'Changing network to {var1}')
         elif n == 5:
-            # Click on the network: Instagram follow
-            but = self.wait.until(EC.presence_of_element_located((By.LINK_TEXT, 'Instagram Followers')))
-            but.click()
+            var1 = 'Instagram Followers'
+            var2 = 'igCookies.pkl'
+            var3 = self.like_IG_follow
+            print(f'Changing network to {var1}')
+        elif n >= 6:
+            quit()
 
-            # Wait for any button to appear
-            self.list_of_like_buttons = self.get_list_of_like_buttons()
-
-            # Keep clicking on the button, until it is clickable (it reacts)DK
-            self.click_on_button(but_nr=0)
-
-            # Switch to the popup; load cookies; follow the person; close popup.
-            self.switch_to_popup()
-            self.load_IG_cookies()
-            self.like_IG_follow(n=0)
+        self.prepare_network(network_name=var1,
+                             cookies_filename=var2,
+                             action_func=var3
+                             )
 
     def add_to_recentlyCompletedNames(self, but_nr, name):
         global recently_done_names
         try:
-            print('HAS ALREADY DONE THIS BEFORE, SKIPPING IT !!!!!!!!')
             # If the name already has been noted, assume it has been completed before (or broken) and SKIP IT'
             recently_done_names[name]
-            sleep(2)
-            list_of_skip_buttons[but_nr].click()
+            print('HAS ALREADY DONE THIS BEFORE, SKIPPING IT !!!!!!!!')
+            self.click_on_button(button=list_of_skip_buttons[but_nr])
         except KeyError:
             # add it to the dict
             recently_done_names[name] = True
@@ -380,11 +368,15 @@ browser.get('http://kingdomlikes.com/free_points/facebook-likes')
 bot_1 = KingdomLikesBot()
 bot_1.login_KingdomLikes(email=data['email'], pwd=data['pwd'])
 
-for network_nr in range(4, 6):
+for network_nr in range(1, 6):
+    if network_nr == 4:
+        continue # Skip liking IG photos - THERE IS AN ERROR
+
     assume_finnished = False # If two buttons in succession are taking too long to load -> change network
     bot_1.FINNISHED = False
     bot_1.change_network(n=network_nr)
     but_nr = 1
+    failed_clicks = 0 # Counts the number of time a button has been clicked on while unclickable (blue loading screen)
     recently_done_names = {}  # To make sure, it doesn't retries the same names several times
     # When the bot (think) it has completed one, temp save it in this dict, if it later reappears
     # don't try to complete it - skip it instead.
@@ -392,8 +384,8 @@ for network_nr in range(4, 6):
     while not bot_1.FINNISHED:
         try:
             print('BUTTON_NR ->', but_nr)
-            list_of_like_buttons = WebDriverWait(browser, 30).until(EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".button.blue")))
-            list_of_skip_buttons = WebDriverWait(browser, 30).until(EC.visibility_of_all_elements_located((By.LINK_TEXT, "[Skip]")))
+            list_of_like_buttons = WebDriverWait(browser, 15).until(EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".button.blue")))
+            list_of_skip_buttons = WebDriverWait(browser, 15).until(EC.visibility_of_all_elements_located((By.LINK_TEXT, "[Skip]")))
             list_of_names = [x.text for x in browser.find_elements_by_css_selector("div > div.container > div.containertitle.remove > h6")]
             print('Found: like buttons: {}\tskip buttons: {}\t names: {}'.format(len(list_of_like_buttons), len(list_of_skip_buttons), list_of_names))
         except TimeoutException as e:
@@ -423,13 +415,18 @@ for network_nr in range(4, 6):
                 else:
                     # This will be set to False again, if the next button is succesfully pressed (we reach the button of this while loop)
                     assume_finnished = True
-
-            continue
+            else:
+                continue
 
         failed_clicks = 0 # Counts the number of time a button has been clicked on while unclickable (blue loading screen)
 
         # Wait for the popup to appear and then switch to it
-        bot_1.switch_to_popup()
+        if bot_1.switch_to_popup():
+            # succesfully switched to popup
+            pass
+        else:
+            # Failed to switch to popup
+            continue
 
         # Like/dislike/share depending on n (the network eg. 'FB page Likes' or 'YT disLikes') handle the situation accordingly. if not succesful -> failure = True
         if network_nr == 1:
@@ -443,7 +440,7 @@ for network_nr in range(4, 6):
         elif network_nr == 5:
             failure = bot_1.like_IG_follow(n=but_nr)
 
-        print(bool(failure), failure, failure - 1)
+        print("failure:", bool(failure), failure, failure - 1)
         if failure:
             # If failed to like the fb page; assume the popup is broken -> skip it
             sleep(5)
