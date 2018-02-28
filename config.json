@@ -1,5 +1,5 @@
 {
-        "webdriver_filepath": "C:\\Users\\sebas\\Documents\\chromedriver.exe",
+        "webdriver_filepath": "C:\\PATH_TO_chromedriver.exe",
         "email": "",
         "pwd": ""
 }
