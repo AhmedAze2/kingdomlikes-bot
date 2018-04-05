@@ -21,6 +21,19 @@ browser = webdriver.Chrome(data['webdriver_filepath'])
 # fbCookies.pkl
 # igCookies.pkl
 
+def collect_cookies():
+	"""Collects cookies
+	This function should be run before runnign any
+	method from the KingdomLikesBot class"""
+	for prefix in ('yt', 'fb', 'ig'):
+		if prefix == 'yt':
+			input('Log in to your youtube account, and click enter.')
+		elif prefix == 'fb':
+			input('Log in to your facebook account, and click enter.')
+		elif prefix == 'ig':
+			input('Log in to your instagram account, and click enter.')
+		KingdomLikesBot.collect_cookies(filename = prefix+'Cookies.pkl')
+
 class KingdomLikesBot:
     def __init__(self):
         self.FINNISHED = False
@@ -28,7 +41,8 @@ class KingdomLikesBot:
         self.popup = None
 
         self.wait = WebDriverWait(browser, 10)
-        
+
+    @staticmethod
     def collect_cookies(self, filename):
         """This function collects cookies for later use."""
         with open(filename, 'wb') as file:
@@ -371,101 +385,112 @@ class KingdomLikesBot:
             if len(recently_done_names) > 20:
                 recently_done_names = {}
 
+def main():
+	browser.get('http://kingdomlikes.com/free_points/facebook-likes')
+	bot_1 = KingdomLikesBot()
+	bot_1.login_KingdomLikes(email=data['email'], pwd=data['pwd'])
 
-browser.get('http://kingdomlikes.com/free_points/facebook-likes')
-bot_1 = KingdomLikesBot()
-bot_1.login_KingdomLikes(email=data['email'], pwd=data['pwd'])
+	for network_nr in range(1, 6):
+	    if network_nr == 4:
+	        continue # Skip liking IG photos - THERE IS AN ERROR
 
-for network_nr in range(1, 6):
-    if network_nr == 4:
-        continue # Skip liking IG photos - THERE IS AN ERROR
+	    assume_finnished = False # If two buttons in succession are taking too long to load -> change network
+	    bot_1.FINNISHED = False
+	    bot_1.change_network(n=network_nr)
+	    but_nr = 1
+	    failed_clicks = 0 # Counts the number of time a button has been clicked on while unclickable (blue loading screen)
+	    recently_done_names = {}  # To make sure, it doesn't retries the same names several times
+	    # When the bot (think) it has completed one, temp save it in this dict, if it later reappears
+	    # don't try to complete it - skip it instead.
 
-    assume_finnished = False # If two buttons in succession are taking too long to load -> change network
-    bot_1.FINNISHED = False
-    bot_1.change_network(n=network_nr)
-    but_nr = 1
-    failed_clicks = 0 # Counts the number of time a button has been clicked on while unclickable (blue loading screen)
-    recently_done_names = {}  # To make sure, it doesn't retries the same names several times
-    # When the bot (think) it has completed one, temp save it in this dict, if it later reappears
-    # don't try to complete it - skip it instead.
+	    while not bot_1.FINNISHED:
+	        try:
+	            print('BUTTON_NR ->', but_nr)
+	            list_of_like_buttons = WebDriverWait(browser, 10).until(EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".button.blue")))
+	            list_of_skip_buttons = WebDriverWait(browser, 10).until(EC.visibility_of_all_elements_located((By.LINK_TEXT, "[Skip]")))
+	            list_of_names = [x.text for x in browser.find_elements_by_css_selector("div > div.container > div.containertitle.remove > h6")]
+	            print('Found: like buttons: {}\tskip buttons: {}\t names: {}'.format(len(list_of_like_buttons), len(list_of_skip_buttons), list_of_names))
+	        except TimeoutException as e:
+	            print('There is not more points to be earned on this network. Error:', e)
+	            bot_1.FINNISHED = True
+	            continue
 
-    while not bot_1.FINNISHED:
-        try:
-            print('BUTTON_NR ->', but_nr)
-            list_of_like_buttons = WebDriverWait(browser, 10).until(EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".button.blue")))
-            list_of_skip_buttons = WebDriverWait(browser, 10).until(EC.visibility_of_all_elements_located((By.LINK_TEXT, "[Skip]")))
-            list_of_names = [x.text for x in browser.find_elements_by_css_selector("div > div.container > div.containertitle.remove > h6")]
-            print('Found: like buttons: {}\tskip buttons: {}\t names: {}'.format(len(list_of_like_buttons), len(list_of_skip_buttons), list_of_names))
-        except TimeoutException as e:
-            print('There is not more points to be earned on this network. Error:', e)
-            bot_1.FINNISHED = True
-            continue
+	        try:
+	            list_of_like_buttons[but_nr].click()
+	        except IndexError:
+	            # There isn't a eg. fifth button, set but_nr to click to -> 0
+	            print('- ERROR: IndexError!')
+	            but_nr = 0
+	            continue
+	        except WebDriverException as e:
+	            # The button is loading (blue loading screen over it) - not clickable
+	            print('- ERROR: element is loading - not clickable. Could be a result of the window being resized.\n', e)
+	            failed_clicks += 1
+	            if failed_clicks <= 30:
+	                # If failed to click on 'but_nr' button 30 times; give it time to load -> click on next button.
+	                but_nr += 1
+	                failed_clicks = 0
+	                # If the former button wasn't clickable either (assume_finnished==True)
+	                if assume_finnished:
+	                    # Change network
+	                    bot_1.FINNISHED = True
+	                    continue
+	                else:
+	                    # This will be set to False again, if the next button is succesfully pressed (we reach the button of this while loop)
+	                    assume_finnished = True
+	            else:
+	                continue
 
-        try:
-            list_of_like_buttons[but_nr].click()
-        except IndexError:
-            # There isn't a eg. fifth button, set but_nr to click to -> 0
-            print('- ERROR: IndexError!')
-            but_nr = 0
-            continue
-        except WebDriverException as e:
-            # The button is loading (blue loading screen over it) - not clickable
-            print('- ERROR: element is loading - not clickable. Could be a result of the window being resized.\n', e)
-            failed_clicks += 1
-            if failed_clicks <= 30:
-                # If failed to click on 'but_nr' button 30 times; give it time to load -> click on next button.
-                but_nr += 1
-                failed_clicks = 0
-                # If the former button wasn't clickable either (assume_finnished==True)
-                if assume_finnished:
-                    # Change network
-                    bot_1.FINNISHED = True
-                    continue
-                else:
-                    # This will be set to False again, if the next button is succesfully pressed (we reach the button of this while loop)
-                    assume_finnished = True
-            else:
-                continue
+	        failed_clicks = 0 # Counts the number of time a button has been clicked on while unclickable (blue loading screen)
 
-        failed_clicks = 0 # Counts the number of time a button has been clicked on while unclickable (blue loading screen)
+	        # Wait for the popup to appear and then switch to it
+	        if bot_1.switch_to_popup():
+	            # succesfully switched to popup
+	            pass
+	        else:
+	            # Failed to switch to popup
+	            continue
 
-        # Wait for the popup to appear and then switch to it
-        if bot_1.switch_to_popup():
-            # succesfully switched to popup
-            pass
-        else:
-            # Failed to switch to popup
-            continue
+	        # Like/dislike/share depending on n (the network eg. 'FB page Likes' or 'YT disLikes') handle the situation accordingly. if not succesful -> failure = True
+	        if network_nr == 1:
+	            failure = bot_1.like_YT_video(n=but_nr)
+	        elif network_nr == 2:
+	            failure = bot_1.dislike_YT_video(n=but_nr)
+	        elif network_nr == 3:
+	            failure = bot_1.like_FB_page(n=but_nr)
+	        elif network_nr == 4:
+	            failure = bot_1.like_IG_photo(n=but_nr)
+	        elif network_nr == 5:
+	            failure = bot_1.like_IG_follow(n=but_nr)
 
-        # Like/dislike/share depending on n (the network eg. 'FB page Likes' or 'YT disLikes') handle the situation accordingly. if not succesful -> failure = True
-        if network_nr == 1:
-            failure = bot_1.like_YT_video(n=but_nr)
-        elif network_nr == 2:
-            failure = bot_1.dislike_YT_video(n=but_nr)
-        elif network_nr == 3:
-            failure = bot_1.like_FB_page(n=but_nr)
-        elif network_nr == 4:
-            failure = bot_1.like_IG_photo(n=but_nr)
-        elif network_nr == 5:
-            failure = bot_1.like_IG_follow(n=but_nr)
+	        print("failure:", bool(failure), failure, failure - 1)
+	        if failure:
+	            # If failed to like the fb page; assume the popup is broken -> skip it
+	            sleep(5)
+	            try:
+	                list_of_skip_buttons[failure - 1].click()
+	                sleep(2)
+	            except WebDriverException as e:
+	                print('- ERROR: element is loading - not clickable\n', e)
+	                continue
+	        else:
+	            print('but_nr: {}, name: "{}" of type: {}'.format(but_nr, list_of_names[but_nr], type(list_of_names[but_nr])))
+	            # Check if it is in 'recently_done_names'; if it is SKIP IT; else add it to the dict.
+	            bot_1.add_to_recentlyCompletedNames(but_nr=but_nr, name=list_of_names[but_nr])
 
-        print("failure:", bool(failure), failure, failure - 1)
-        if failure:
-            # If failed to like the fb page; assume the popup is broken -> skip it
-            sleep(5)
-            try:
-                list_of_skip_buttons[failure - 1].click()
-                sleep(2)
-            except WebDriverException as e:
-                print('- ERROR: element is loading - not clickable\n', e)
-                continue
-        else:
-            print('but_nr: {}, name: "{}" of type: {}'.format(but_nr, list_of_names[but_nr], type(list_of_names[but_nr])))
-            # Check if it is in 'recently_done_names'; if it is SKIP IT; else add it to the dict.
-            bot_1.add_to_recentlyCompletedNames(but_nr=but_nr, name=list_of_names[but_nr])
+	            # Succesfully handled the popup; 'but_nr += 1' so handle the next but_nr popup
+	            but_nr += 1
+	            sleep(2)
 
-            # Succesfully handled the popup; 'but_nr += 1' so handle the next but_nr popup
-            but_nr += 1
-            sleep(2)
+	        assume_finnished = False
 
-        assume_finnished = False
+
+if __name__ == '__main__':
+	# You can uncomment this function when you are done collecting cookies,
+	# so that you won't have to collect new cookies at each run.
+	collect_cookies()
+
+	# After you have collected the cookies from your social media accounts
+	# Run the 'main' function
+	main()
+
