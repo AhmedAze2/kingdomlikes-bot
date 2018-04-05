@@ -1,5 +1,5 @@
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.common.exceptions import TimeoutException, WebDriverException, StaleElementReferenceException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.common import exceptions
@@ -7,8 +7,11 @@ from selenium import webdriver
 from time import sleep
 import itertools, re, pickle, json
 
-with open('config.json') as data_file:
-    data = json.load(data_file)
+try:
+    with open('config.json') as data_file:
+        data = json.load(data_file)
+except FileNotFoundError:
+    print('"config.json" was not found.')
 
 browser = webdriver.Chrome(data['webdriver_filepath'])
 #browser.set_window_position(1100,5)
@@ -87,6 +90,7 @@ class KingdomLikesBot:
             likeBut = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'ytd-video-primary-info-renderer > div > div > div > div > ytd-menu-renderer > div > ytd-toggle-button-renderer:nth-child(2) > a')))
             likeBut.click()
             print('----> Disliked video')
+            sleep(1.5)
 
             # Close the popup
             browser.close()
@@ -113,6 +117,7 @@ class KingdomLikesBot:
             likeBut = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'a._eszkz._l9yih')))
             likeBut.click()
             print('----> liked the IG photo')
+            sleep(1.5)
 
             # Close the popup
             browser.close()
@@ -137,6 +142,7 @@ class KingdomLikesBot:
             likeBut = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'button._qv64e')))           #(By.CSS_SELECTOR, 'span > button._qv64e._gexxb._r9b8f._njrw0'))) _qv64e _t78yp _r9b8f _njrw0
             likeBut.click()
             print('----> followed the person')
+            sleep(1.5)
 
             # Close the popup
             browser.close()
@@ -166,6 +172,7 @@ class KingdomLikesBot:
             likeBut = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'form > div > div > div > div > div > div > div > span > div > a')))
             likeBut.click()
             print('----> Liked the fb photo')
+            sleep(1.5)
 
             # Close the popup
             browser.close()
@@ -218,6 +225,7 @@ class KingdomLikesBot:
             EC.element_to_be_clickable((By.CSS_SELECTOR, 'div > div > div > div > div > div > span:nth-child(1) > div > a')))
         likeBut.click()
         print('----> SYNES GODT OM')
+        sleep(1.5)
 
     def _get_allLikeButtons(self) -> list:
         """Locate all the (links to facebook pages) buttons that are ready."""
@@ -384,14 +392,15 @@ for network_nr in range(1, 6):
     while not bot_1.FINNISHED:
         try:
             print('BUTTON_NR ->', but_nr)
-            list_of_like_buttons = WebDriverWait(browser, 15).until(EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".button.blue")))
-            list_of_skip_buttons = WebDriverWait(browser, 15).until(EC.visibility_of_all_elements_located((By.LINK_TEXT, "[Skip]")))
+            list_of_like_buttons = WebDriverWait(browser, 10).until(EC.visibility_of_all_elements_located((By.CSS_SELECTOR, ".button.blue")))
+            list_of_skip_buttons = WebDriverWait(browser, 10).until(EC.visibility_of_all_elements_located((By.LINK_TEXT, "[Skip]")))
             list_of_names = [x.text for x in browser.find_elements_by_css_selector("div > div.container > div.containertitle.remove > h6")]
             print('Found: like buttons: {}\tskip buttons: {}\t names: {}'.format(len(list_of_like_buttons), len(list_of_skip_buttons), list_of_names))
         except TimeoutException as e:
             print('There is not more points to be earned on this network. Error:', e)
             bot_1.FINNISHED = True
             continue
+
         try:
             list_of_like_buttons[but_nr].click()
         except IndexError:
